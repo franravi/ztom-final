@@ -38,16 +38,49 @@ const particlesOptions  = {
 }
 
 class   App   extends Component   {
-  constructor() {
+  constructor()
+  {
     super();
-    this.state  = {
-      input:      '',
-      imageUrl:   '',
-      box:        {},
-      route:      'signin',
-      isSignedIn: false, 
+    this.state  =
+    { input:        ''
+    , imageUrl:     ''
+    , box:          {}
+    , route:        'signin'
+    , isSignedIn:   false
+    , user:         { id:       ''
+                    , name:     ''
+                    , email:    ''
+                    , entries:  0
+                    , joined:   ''
+                    }
     }
   }
+
+  loadUser = (data) =>
+  {
+    console.log('loadUser::data', data)
+
+    this.setState({ user: { id:       data.id
+                          , name:     data.name
+                          , email:    data.email
+                          , entries:  data.entries
+                          , joined:   data.joined
+                          }
+                  })
+  }
+
+  /*
+  **  componentDidMount() - Method invoked immediately after a component is mounted
+  **                        (inserted into the tree).
+  *//*
+  **  REMOVED:  It was used to test connection to backend.
+  *//*
+  componentDidMount() {
+    fetch('http://localhost:3000')
+      .then(response => response.json())
+      .then(console.log)
+  }
+  /**/
 
   /*
   **  calculateFaceLocation() - We will grab the output of clarifai and calculate a box that outlines the face detected
@@ -87,32 +120,59 @@ class   App   extends Component   {
   }
 
   /*
-  **  onButtonSubmit()  - Here we grab the image the user typed (and that we grabbed with onInputChange), set it in
-  **  imageUrl, and call Clarifai to do analisis and detection of the image.
+  **  onButtonSubmit()  - Here we grab the image the user typed (and that we grabbed with
+  **                      onInputChange), set it in imageUrl, and call Clarifai to do
+  **                      analisis and detection of the image.
   */
   onButtonSubmit  = () => {
-    //  TODO:  setState is asynchronous, so there is a chance that it may still be pending to be executed when the
-    //  Clarifai predict call gets executed.  To fix this, we should modify it with setState(updater, callback).  For
-    //  now, I will keep this untouched to stick to the course.
+    //  TODO: setState is asynchronous, so there is a chance that it may still be pending
+    //        to be executed when the Clarifai predict call gets executed.  To fix this, we
+    //        should modify it with setState(updater, callback).  For now, I will keep this
+    //        untouched to stick to the course.
     //
     this.setState({imageUrl: this.state.input});
 
-    app.models.predict(
-      Clarifai.FACE_DETECT_MODEL,
-      this.state.input
-    )
-    .then(response  =>  this.displayFaceBox(this.calculateFaceLocation(response)))
-    .catch(err      =>  console.log('error', err)             )
-    ;
+    app.models
+      .predict(
+        Clarifai.FACE_DETECT_MODEL,
+        this.state.input
+      )
+      .then(response  =>
+        {
+          if (response)
+          {
+            fetch('http://localhost:3000/image',
+                  { method: 'put'
+                  , headers: { 'Content-Type': 'application/json'}
+                  , body: JSON.stringify( { id: this.state.user.id })
+                  })
+              .then(response => response.json())
+              .then(count =>
+              {
+                //  We had this.setState({user:{entries:count}}); but it causes us to loose
+                //  the user name we displayed.  We replace that line to use Object.assign(),
+                //  passing the object as first argument, and the values that we need to be
+                //  updated into the object as second argument.
+                //
+                this.setState(Object.assign(this.state.user, { entries:count }))
+              })
+          }
+          this.displayFaceBox(this.calculateFaceLocation(response))
+        })
+      .catch(err =>  console.log('error', err))
   }
 
   /*
   **  onRouteChange() -
   */
-  onRouteChange   = (route)  => {
-    if (route === 'signout') {
+  onRouteChange   = (route)  =>
+  {
+    if (route === 'signout')
+    {
       this.setState({isSignedIn: false})
-    } else if (route === 'home') {
+    }
+    else if (route === 'home')
+    {
       this.setState({isSignedIn: true})
     }
     this.setState({route: route});
@@ -121,34 +181,115 @@ class   App   extends Component   {
   /*
   **  render()  -
   */
-  render()  {
-    const { isSignedIn, imageUrl, route, box }  = this.state;
+  render()
+  {
+    const { isSignedIn, imageUrl, route, box, user }  = this.state;
+    let main = {};
 
+    console.log('state', this.state, 'frontend app.js render()')
+
+    if  (route  ===   'home')
+    {
+      console.log('generating homepage for user', user)
+
+      main =
+      ( <div>
+          <Logo />
+          <Rank
+            name={user.name}
+            entries={user.entries}
+          />
+          <ImageLinkForm
+            onInputChange={this.onInputChange}
+            onButtonSubmit={this.onButtonSubmit}
+          />
+          <FaceRecognition
+            box={box}
+            imageUrl={imageUrl}
+          />
+        </div>
+      );
+    }
+    else if (route ===  'signin')
+    {
+      console.log('generating signin page')
+
+      main =
+      ( <Signin
+          loadUser={this.loadUser}
+          onRouteChange={this.onRouteChange}
+        />
+      )
+    }
+    else
+    {
+      console.log('generating register page')
+
+      main =
+      ( <Register
+          loadUser={this.loadUser}
+          onRouteChange={this.onRouteChange}
+        />
+      )
+    }
+
+    console.log('attaching all page together')
+    
     return (
       <div className="App">
         <Particles
           className='particles'
           params={particlesOptions}
         />
-        <Navigation onRouteChange={this.onRouteChange} isSignedIn={isSignedIn} />
+        <Navigation
+          isSignedIn={isSignedIn}
+          onRouteChange={this.onRouteChange}
+        />
+        {main}
+      </div>
+    );
+
+    /*
+    return (
+      <div className="App">
+        <Particles
+          className='particles'
+          params={particlesOptions}
+        />
+        <Navigation
+          isSignedIn={isSignedIn}
+          onRouteChange={this.onRouteChange}
+        />
         { route  ===   'home'
           ? <div>
               <Logo />
-              <Rank />
+              <Rank
+                name={user.name}
+                entries={user.entries}
+              />
               <ImageLinkForm
                 onInputChange={this.onInputChange}
                 onButtonSubmit={this.onButtonSubmit}
               />
-              <FaceRecognition box={box} imageUrl={imageUrl} />
+              <FaceRecognition
+                box={box}
+                imageUrl={imageUrl}
+              />
             </div>
-          : (
-              route ===  'signin'
-              ? <Signin onRouteChange={this.onRouteChange} />
-              : <Register onRouteChange={this.onRouteChange} />
+          : ( route ===  'signin'
+              ? <Signin
+                  loadUser={this.loadUser}
+                  onRouteChange={this.onRouteChange}
+                />
+              : <Register
+                  loadUser={this.loadUser}
+                  onRouteChange={this.onRouteChange}
+                />
             )
         }
       </div>
     );
+    */
   }
 }
 
